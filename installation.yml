@@ -1,0 +1,33 @@
+---
+ - hosts: all
+   vars:
+     keyboard_layout: fr
+     keyboard_variant: latin9
+     needed_packages:
+         - xorg
+         - xserver-xorg-input-kbd
+         - adobereader-enu
+         - gtk2-engines-pixbuf
+         - vim
+         - mingetty
+   post_tasks:
+     - name: Ensure partner repository is activated
+       apt_repository: repo="deb http://archive.canonical.com/ubuntu {{ansible_distribution_release}} partner"
+     - name: Ensure needed packages are installed
+       apt: pkg={{item}} state=installed
+       with_items: needed_packages
+     - name: autostart adobe reader at startx
+       shell: echo acroread > /home/vagrant/.xinitrc
+     - name: change bashrc to startx
+       lineinfile: dest=/home/vagrant/.bashrc regexp="^if.*tty1" line="if [ `tty` == '/dev/tty1' ]; then startx; fi"
+     - name: ensure tty1 autologin vagrant
+       lineinfile: dest=/etc/init/tty1.conf regexp="^exec " line="exec /sbin/mingetty --autologin vagrant --noclear tty1"
+     - name: ensure keyboard layout is correct 1/2
+       command: loadkeys {{keyboard_layout}}
+     - name: ensure keyboard layout is correct 2/2
+       lineinfile: dest=/etc/default/keyboard regexp="^{{item.key}}=" line='{{item.key}}="{{item.value}}"'
+       with_items:
+          - { key: "XKBLAYOUT", value: "{{keyboard_layout}}"}
+          - { key: "XKBVARIANT", value: "{{keyboard_variant}}"}
+     - name: reload tty1
+       command: initctl restart tty1
